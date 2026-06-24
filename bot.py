@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 
@@ -27,10 +28,14 @@ async def start(update: Update, context) -> None:
 
 async def handle_search(update: Update, context) -> None:
     query = update.message.text.strip()
+    if len(query) < 3:
+        await update.message.reply_text("Введи не менее 3 символов для поиска")
+        return
     status_msg = await update.message.reply_text("Ищу...")
 
     try:
-        results = client.search(query)
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(None, client.search, query)
     except Exception:
         logger.exception("Search failed for query: %s", query)
         await status_msg.edit_text("Rutracker временно недоступен")
@@ -61,8 +66,9 @@ async def handle_selection(update: Update, context) -> None:
     await query.edit_message_text("Скачиваю...")
 
     try:
-        torrent_bytes = client.get_torrent(topic_id)
-        magnet = client.get_magnet(topic_id)
+        loop = asyncio.get_event_loop()
+        torrent_bytes = await loop.run_in_executor(None, client.get_torrent, topic_id)
+        magnet = await loop.run_in_executor(None, client.get_magnet, topic_id)
     except Exception:
         logger.exception("Download failed for topic_id: %s", topic_id)
         await query.edit_message_text("Rutracker временно недоступен")

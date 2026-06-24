@@ -1,7 +1,9 @@
+import re
 import requests
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import urlparse, parse_qs
 
 BASE_URL = "https://rutracker.org/forum"
 
@@ -72,6 +74,9 @@ class RutrackerClient:
             self.login()
             resp = self.session.get(f"{BASE_URL}/dl.php", params={"t": topic_id})
         resp.raise_for_status()
+        ct = resp.headers.get("Content-Type", "")
+        if "bittorrent" not in ct and not resp.content.startswith(b"d"):
+            raise ValueError(f"Response is not a torrent file (Content-Type: {ct})")
         return resp.content
 
     def get_magnet(self, topic_id: str) -> Optional[str]:
@@ -80,6 +85,10 @@ class RutrackerClient:
             f"{BASE_URL}/viewtopic.php",
             params={"t": topic_id},
         )
+        if "login.php" in resp.url:
+            self._logged_in = False
+            self.login()
+            resp = self.session.get(f"{BASE_URL}/viewtopic.php", params={"t": topic_id})
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         link = soup.find("a", class_="magnet-link")
@@ -102,11 +111,14 @@ class RutrackerClient:
                 if not link:
                     continue
                 href = link.get("href", "")
-                topic_id = href.split("t=")[-1]
+                parsed = urlparse(href)
+                topic_id = parse_qs(parsed.query).get("t", [""])[0]
+                if not topic_id:
+                    continue
                 title = link.text.strip()
                 size_cell = row.find("td", class_="tor-size")
                 size = size_cell.text.strip() if size_cell else "?"
-                seeds_el = row.find("b", class_="seedmed")
+                seeds_el = row.find("b", class_=re.compile(r"seed(med|good|bad|null)"))
                 seeders = int(seeds_el.text.strip()) if seeds_el else 0
                 results.append(SearchResult(
                     topic_id=topic_id,

@@ -159,6 +159,7 @@ def test_get_magnet_returns_link(mock_session_cls):
     mock_session = MagicMock()
     mock_session_cls.return_value = mock_session
     mock_response = MagicMock()
+    mock_response.url = "https://rutracker.org/forum/viewtopic.php?t=12345"
     mock_response.text = TOPIC_HTML_WITH_MAGNET
     mock_session.get.return_value = mock_response
 
@@ -174,6 +175,7 @@ def test_get_magnet_returns_none_if_not_found(mock_session_cls):
     mock_session = MagicMock()
     mock_session_cls.return_value = mock_session
     mock_response = MagicMock()
+    mock_response.url = "https://rutracker.org/forum/viewtopic.php?t=12345"
     mock_response.text = TOPIC_HTML_NO_MAGNET
     mock_session.get.return_value = mock_response
 
