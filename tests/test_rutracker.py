@@ -120,3 +120,65 @@ def test_search_redirects_to_login_triggers_relogin(mock_session_cls):
 
     assert mock_session.post.called  # re-login happened
     assert len(results) == 2
+
+
+TOPIC_HTML_WITH_MAGNET = """
+<html><body>
+<a class="magnet-link" href="magnet:?xt=urn:btih:abc123def456&dn=Interstellar">
+  Magnet link
+</a>
+</body></html>
+"""
+
+TOPIC_HTML_NO_MAGNET = "<html><body><p>No magnet here</p></body></html>"
+
+FAKE_TORRENT_BYTES = b"d8:announce35:http://retracker.local/announce13:announce-listlee"
+
+
+@patch("rutracker.requests.Session")
+def test_get_torrent_returns_bytes(mock_session_cls):
+    mock_session = MagicMock()
+    mock_session_cls.return_value = mock_session
+    mock_response = MagicMock()
+    mock_response.url = "https://rutracker.org/forum/dl.php?t=12345"
+    mock_response.content = FAKE_TORRENT_BYTES
+    mock_session.get.return_value = mock_response
+
+    client = make_client()
+    client._logged_in = True
+    result = client.get_torrent("12345")
+
+    assert result == FAKE_TORRENT_BYTES
+    mock_session.get.assert_called_once()
+    call_args = mock_session.get.call_args
+    assert "dl.php" in call_args.args[0]
+
+
+@patch("rutracker.requests.Session")
+def test_get_magnet_returns_link(mock_session_cls):
+    mock_session = MagicMock()
+    mock_session_cls.return_value = mock_session
+    mock_response = MagicMock()
+    mock_response.text = TOPIC_HTML_WITH_MAGNET
+    mock_session.get.return_value = mock_response
+
+    client = make_client()
+    client._logged_in = True
+    magnet = client.get_magnet("12345")
+
+    assert magnet == "magnet:?xt=urn:btih:abc123def456&dn=Interstellar"
+
+
+@patch("rutracker.requests.Session")
+def test_get_magnet_returns_none_if_not_found(mock_session_cls):
+    mock_session = MagicMock()
+    mock_session_cls.return_value = mock_session
+    mock_response = MagicMock()
+    mock_response.text = TOPIC_HTML_NO_MAGNET
+    mock_session.get.return_value = mock_response
+
+    client = make_client()
+    client._logged_in = True
+    magnet = client.get_magnet("12345")
+
+    assert magnet is None

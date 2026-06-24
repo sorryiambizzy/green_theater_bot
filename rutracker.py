@@ -61,6 +61,32 @@ class RutrackerClient:
             resp.raise_for_status()
         return self._parse_search_results(resp.text)
 
+    def get_torrent(self, topic_id: str) -> bytes:
+        self._ensure_logged_in()
+        resp = self.session.get(
+            f"{BASE_URL}/dl.php",
+            params={"t": topic_id},
+        )
+        if "login.php" in resp.url:
+            self._logged_in = False
+            self.login()
+            resp = self.session.get(f"{BASE_URL}/dl.php", params={"t": topic_id})
+        resp.raise_for_status()
+        return resp.content
+
+    def get_magnet(self, topic_id: str) -> Optional[str]:
+        self._ensure_logged_in()
+        resp = self.session.get(
+            f"{BASE_URL}/viewtopic.php",
+            params={"t": topic_id},
+        )
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        link = soup.find("a", class_="magnet-link")
+        if link:
+            return link.get("href")
+        return None
+
     def _parse_search_results(self, html: str) -> list[SearchResult]:
         soup = BeautifulSoup(html, "html.parser")
         results = []
