@@ -1,0 +1,14 @@
+[Unit]
+Description=Rutracker Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/rutracker-bot
+ExecStart=/opt/rutracker-bot/venv/bin/python bot.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
