@@ -3,6 +3,34 @@ import pytest
 from rutracker import RutrackerClient
 
 
+SEARCH_HTML = """
+<table id="tor-tbl">
+  <tbody>
+    <tr class="tCenter">
+      <td class="t-title">
+        <a class="tLink" href="/forum/viewtopic.php?t=12345">
+          Интерстеллар / Interstellar (2014) BDRip 1080p
+        </a>
+      </td>
+      <td class="tor-size" data-ts_text="16344498176">15.2 GB</td>
+      <td><b class="seedmed">142</b></td>
+    </tr>
+    <tr class="tCenter">
+      <td class="t-title">
+        <a class="tLink" href="/forum/viewtopic.php?t=67890">
+          Интерстеллар / Interstellar (2014) HDRip 720p
+        </a>
+      </td>
+      <td class="tor-size" data-ts_text="5000000000">4.8 GB</td>
+      <td><b class="seedmed">89</b></td>
+    </tr>
+  </tbody>
+</table>
+"""
+
+EMPTY_HTML = "<html><body><p>No results</p></body></html>"
+
+
 def make_client():
     return RutrackerClient("testuser", "testpass")
 
@@ -33,3 +61,62 @@ def test_login_failure_no_cookie(mock_session_cls):
         client.login()
 
     assert client._logged_in is False
+
+
+def test_parse_search_results_returns_results():
+    client = make_client()
+    results = client._parse_search_results(SEARCH_HTML)
+    assert len(results) == 2
+    assert results[0].topic_id == "12345"
+    assert results[0].title == "Интерстеллар / Interstellar (2014) BDRip 1080p"
+    assert results[0].size == "15.2 GB"
+    assert results[0].seeders == 142
+
+
+def test_parse_search_results_empty_page():
+    client = make_client()
+    results = client._parse_search_results(EMPTY_HTML)
+    assert results == []
+
+
+def test_parse_search_results_caps_at_10():
+    row = """
+    <tr class="tCenter">
+      <td class="t-title">
+        <a class="tLink" href="/forum/viewtopic.php?t={i}">Title {i}</a>
+      </td>
+      <td class="tor-size">1 GB</td>
+      <td><b class="seedmed">10</b></td>
+    </tr>"""
+    rows = "".join(row.format(i=i) for i in range(15))
+    html = f'<table id="tor-tbl"><tbody>{rows}</tbody></table>'
+    client = make_client()
+    results = client._parse_search_results(html)
+    assert len(results) == 10
+
+
+@patch("rutracker.requests.Session")
+def test_search_redirects_to_login_triggers_relogin(mock_session_cls):
+    mock_session = MagicMock()
+    mock_session_cls.return_value = mock_session
+
+    # First get: redirected to login page
+    redirect_response = MagicMock()
+    redirect_response.url = "https://rutracker.org/forum/login.php"
+    redirect_response.text = EMPTY_HTML
+
+    # After re-login: normal response
+    normal_response = MagicMock()
+    normal_response.url = "https://rutracker.org/forum/tracker.php"
+    normal_response.text = SEARCH_HTML
+
+    mock_session.get.side_effect = [redirect_response, normal_response]
+    mock_session.post.return_value = MagicMock()
+    mock_session.cookies = {"bb_session": "abc123"}
+
+    client = make_client()
+    client._logged_in = True
+    results = client.search("Интерстеллар")
+
+    assert mock_session.post.called  # re-login happened
+    assert len(results) == 2
