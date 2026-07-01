@@ -1,59 +1,62 @@
 # CLAUDE.md
 
-## What this is
+## Что это
 
-A Telegram bot that searches rutracker.org and sends back the `.torrent` file
-for the release the user picks. Bridges python-telegram-bot (v20) to
+Telegram-бот, который ищет раздачи на rutracker.org и присылает в ответ файл
+`.torrent` для выбранного релиза. Связывает python-telegram-bot (v20) с
 rutracker.org.
 
-## Why login uses Playwright, not plain `requests`
+## Почему логин сделан через Playwright, а не просто через `requests`
 
-rutracker.org's login form requires solving an image captcha before it will
-set the `bb_session` cookie. A bare `requests.post()` to the login endpoint
-can't solve a captcha. `playwright_login()` in `rutracker.py` drives a real
-headless Chromium session: it screenshots the captcha image and relays it to
-the user over Telegram to get the typed code back, then resubmits the form.
+Форма логина rutracker.org требует решить капчу с картинки, прежде чем сайт
+выставит cookie `bb_session`. Обычный `requests.post()` на эндпоинт логина
+капчу не решит. `playwright_login()` в `rutracker.py` управляет настоящей
+headless-сессией Chromium: делает скриншот капчи и пересылает его
+пользователю через Telegram, чтобы получить введённый код, а затем
+пересылает форму заново.
 
-## The threading model in `playwright_login`
+## Модель работы с потоками в `playwright_login`
 
-Playwright's sync API can't run inside the bot's asyncio event loop directly,
-so the browser automation (`run_sync`) executes in a background thread via
-`loop.run_in_executor`. The thread and the event loop hand off the captcha
-screenshot and the user's typed code through two `asyncio.Queue` objects
-(`captcha_queue`, `code_queue`), bridged across the thread boundary with
-`asyncio.run_coroutine_threadsafe`.
+Синхронный API Playwright не может работать напрямую внутри asyncio event
+loop бота, поэтому браузерная автоматизация (`run_sync`) выполняется в
+фоновом потоке через `loop.run_in_executor`. Поток и event loop передают
+друг другу скриншот капчи и введённый пользователем код через два объекта
+`asyncio.Queue` (`captcha_queue`, `code_queue`), связанных через границу
+потоков с помощью `asyncio.run_coroutine_threadsafe`.
 
-Both sides share one timeout constant, `CAPTCHA_TIMEOUT = 300`. This
-symmetry matters: earlier, the thread side had a timeout but the event-loop
-side didn't, so if the thread gave up waiting for a code, the event loop
-would still wait forever for a Telegram reply that would never arrive —
-a permanent, silent deadlock on that chat. If you touch this function, keep
-both sides bounded by the same timeout.
+Обе стороны используют один и тот же таймаут — `CAPTCHA_TIMEOUT = 300`. Эта
+симметрия важна: раньше таймаут был только на стороне потока, а на стороне
+event loop — нет, поэтому если поток переставал ждать код, event loop всё
+равно продолжал бы бесконечно ждать ответ в Telegram, который никогда бы не
+пришёл — постоянный, тихий дедлок в этом чате. Если трогаешь эту функцию,
+следи, чтобы обе стороны были ограничены одним и тем же таймаутом.
 
-## Known fragility: HTML parsing
+## Известная хрупкость: разбор HTML
 
-`RutrackerClient._parse_search_results` parses rutracker's search results
-table by CSS class name (`tor-tbl`, `t-title-col`, `tor-size`, etc.). When
-rutracker renames these classes, the parser doesn't raise an error — it
-silently returns zero results, which looks identical to "nothing found" from
-the user's side. If search results ever go inexplicably empty, compare the
-selectors in `_parse_search_results` against a live response body first
-(temporarily logging `resp.text` from `RutrackerClient.search` to a file is
-the fastest way to see the real markup).
+`RutrackerClient._parse_search_results` разбирает таблицу результатов
+поиска rutracker по именам CSS-классов (`tor-tbl`, `t-title-col`,
+`tor-size` и т.д.). Когда rutracker переименовывает эти классы, парсер не
+выдаёт ошибку — он молча возвращает ноль результатов, что выглядит точно
+так же, как «ничего не найдено» с точки зрения пользователя. Если результаты
+поиска вдруг стали необъяснимо пустыми — в первую очередь сверь селекторы в
+`_parse_search_results` с реальным телом ответа (быстрее всего временно
+залогировать `resp.text` из `RutrackerClient.search` в файл и посмотреть
+настоящую разметку).
 
-## VDS constraints
+## Ограничения VDS
 
-Production runs on a 1 vCPU / ~1GB RAM VDS with a 2GB swap file. Headless
-Chromium is heavy relative to that box: expect a fresh login (whenever the
-rutracker session expires) to take 10-30 seconds, and don't be surprised if
-unrelated work (e.g. Telegram API calls) briefly slows down while Chromium is
-launching. That's a resource constraint, not a bug to chase.
+Продакшен крутится на VDS с 1 vCPU / ~1GB RAM и 2GB swap-файлом. Headless
+Chromium довольно тяжёл для такого сервера: свежий логин (когда сессия
+rutracker протухает) может занимать 10-30 секунд, и не удивляйся, если
+несвязанные операции (например, запросы к Telegram API) на короткое время
+подтормаживают, пока запускается Chromium. Это ограничение по ресурсам, а
+не баг, который надо чинить.
 
-## Deployment
+## Деплой
 
-See `README.md` for full setup instructions. Short version: pushing to
-`main` on GitHub triggers a GitHub Actions workflow
-(`.github/workflows/deploy.yml`) that SSHes into the VDS, runs `git pull`,
-and restarts the `rutracker-bot` systemd service. `/opt/rutracker-bot` on the
-VDS is a real git clone of this repo; the `.env` file there holds the actual
-credentials and is never touched by a deploy.
+Полная инструкция — в `README.md`. Коротко: push в `main` на GitHub
+запускает GitHub Actions workflow (`.github/workflows/deploy.yml`), который
+заходит по SSH на VDS, делает `git pull` и перезапускает systemd-сервис
+`rutracker-bot`. `/opt/rutracker-bot` на VDS — настоящий git-клон этого
+репозитория; файл `.env` там хранит реальные креды и деплоем никогда не
+трогается.

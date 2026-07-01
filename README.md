@@ -1,19 +1,19 @@
 # green_theater_bot
 
-Telegram bot that searches rutracker.org and sends back the `.torrent` file
-for the release you pick.
+Telegram-бот, который ищет раздачи на rutracker.org и присылает в ответ файл
+`.torrent` для выбранного релиза.
 
-Deploys automatically to the VDS on every push to `main` via GitHub Actions.
+Автоматически деплоится на VDS при каждом push в `main` через GitHub Actions.
 
-## How it works
+## Как это работает
 
-- Send a search term to the bot in Telegram.
-- The bot searches rutracker.org (logging in via a headless browser + captcha
-  relay the first time, or whenever the session expires) and shows the top
-  10 matches as buttons.
-- Tap a result, get the `.torrent` file back.
+- Отправляешь боту в Telegram поисковый запрос.
+- Бот ищет на rutracker.org (логинясь через headless-браузер + пересылку
+  капчи в первый раз или когда сессия протухает) и показывает топ-10
+  совпадений кнопками.
+- Нажимаешь на результат — получаешь файл `.torrent`.
 
-## Local setup
+## Локальная установка
 
 ```bash
 git clone git@github.com:sorryiambizzy/green_theater_bot.git
@@ -22,34 +22,34 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 playwright install chromium
-cp .env.example .env   # fill in TELEGRAM_BOT_TOKEN, RUTRACKER_USERNAME, RUTRACKER_PASSWORD
+cp .env.example .env   # заполни TELEGRAM_BOT_TOKEN, RUTRACKER_USERNAME, RUTRACKER_PASSWORD
 python3 bot.py
 ```
 
-## Environment variables (`.env`)
+## Переменные окружения (`.env`)
 
-- `TELEGRAM_BOT_TOKEN` — from [@BotFather](https://t.me/BotFather)
-- `RUTRACKER_USERNAME` / `RUTRACKER_PASSWORD` — your rutracker.org account
+- `TELEGRAM_BOT_TOKEN` — от [@BotFather](https://t.me/BotFather)
+- `RUTRACKER_USERNAME` / `RUTRACKER_PASSWORD` — твой аккаунт на rutracker.org
 
-## Running tests
+## Запуск тестов
 
 ```bash
 pytest tests/ -v
 ```
 
-## Deployment
+## Деплой
 
-The bot runs as a systemd service (`rutracker-bot.service`) on a VDS. Pushes
-to `main` auto-deploy via GitHub Actions (`.github/workflows/deploy.yml`):
-the workflow SSHes in, runs `git pull` + `pip install -r requirements.txt`,
-and restarts the service. The server's `.env` holds the real credentials and
-isn't part of the repo.
+Бот работает как systemd-сервис (`rutracker-bot.service`) на VDS. Push в
+`main` автоматически деплоится через GitHub Actions
+(`.github/workflows/deploy.yml`): workflow заходит по SSH, делает
+`git pull` + `pip install -r requirements.txt` и перезапускает сервис.
+`.env` на сервере хранит реальные креды и в репозиторий не входит.
 
-**Server sizing:** works on a 1 vCPU / 1GB RAM VDS (with a 2GB swap file),
-but logging in via headless Chromium takes 10-30s on that little CPU. 2
-vCPUs is more comfortable if you're setting this up fresh.
+**Требования к серверу:** работает на VDS с 1 vCPU / 1GB RAM (плюс 2GB
+swap-файл), но логин через headless Chromium на таком слабом CPU занимает
+10-30 секунд. Если настраиваешь сервер с нуля, 2 vCPU комфортнее.
 
-To deploy manually to a fresh server:
+Ручной деплой на новый сервер:
 
 ```bash
 git clone https://github.com/sorryiambizzy/green_theater_bot.git /opt/rutracker-bot
@@ -57,11 +57,11 @@ cd /opt/rutracker-bot
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
 venv/bin/playwright install --with-deps chromium
-cp .env.example .env   # fill in real values
+cp .env.example .env   # заполни реальными значениями
 cp rutracker-bot.service /etc/systemd/system/
 systemctl enable --now rutracker-bot
 ```
 
-## License
+## Лицензия
 
-MIT — see [LICENSE](LICENSE).
+MIT — см. [LICENSE](LICENSE).
