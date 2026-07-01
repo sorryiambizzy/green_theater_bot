@@ -6,6 +6,7 @@ from typing import Optional, Callable, Awaitable
 from urllib.parse import urlparse, parse_qs
 
 BASE_URL = "https://rutracker.org/forum"
+CAPTCHA_TIMEOUT = 300
 
 
 @dataclass
@@ -57,7 +58,7 @@ async def playwright_login(
 
                     screenshot = cap_img.screenshot()
                     asyncio.run_coroutine_threadsafe(captcha_queue.put(screenshot), loop).result()
-                    code = asyncio.run_coroutine_threadsafe(code_queue.get(), loop).result(timeout=300)
+                    code = asyncio.run_coroutine_threadsafe(code_queue.get(), loop).result(timeout=CAPTCHA_TIMEOUT)
 
                     page.locator('input[name^="cap_code_"]').fill(code)
                     page.locator('input[name="login"]').last.click()
@@ -85,7 +86,7 @@ async def playwright_login(
         item = await captcha_queue.get()
         if item is None:
             break
-        code = await captcha_callback(item)
+        code = await asyncio.wait_for(captcha_callback(item), timeout=CAPTCHA_TIMEOUT)
         await code_queue.put(code)
 
     await asyncio.wrap_future(executor_future)
@@ -170,7 +171,7 @@ class RutrackerClient:
             return results
         for row in table.find_all("tr", class_="tCenter"):
             try:
-                title_cell = row.find("td", class_="t-title")
+                title_cell = row.find("td", class_="t-title-col")
                 if not title_cell:
                     continue
                 link = title_cell.find("a", class_="tLink")

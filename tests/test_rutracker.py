@@ -7,7 +7,7 @@ SEARCH_HTML = """
 <table id="tor-tbl">
   <tbody>
     <tr class="tCenter">
-      <td class="t-title">
+      <td class="t-title-col">
         <a class="tLink" href="/forum/viewtopic.php?t=12345">
           Интерстеллар / Interstellar (2014) BDRip 1080p
         </a>
@@ -16,7 +16,7 @@ SEARCH_HTML = """
       <td><b class="seedmed">142</b></td>
     </tr>
     <tr class="tCenter">
-      <td class="t-title">
+      <td class="t-title-col">
         <a class="tLink" href="/forum/viewtopic.php?t=67890">
           Интерстеллар / Interstellar (2014) HDRip 720p
         </a>
@@ -82,7 +82,7 @@ def test_parse_search_results_empty_page():
 def test_parse_search_results_caps_at_10():
     row = """
     <tr class="tCenter">
-      <td class="t-title">
+      <td class="t-title-col">
         <a class="tLink" href="/forum/viewtopic.php?t={i}">Title {i}</a>
       </td>
       <td class="tor-size">1 GB</td>

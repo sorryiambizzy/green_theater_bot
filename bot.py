@@ -126,7 +126,6 @@ async def handle_selection(update: Update, context) -> None:
     try:
         loop = asyncio.get_event_loop()
         torrent_bytes = await loop.run_in_executor(None, client.get_torrent, topic_id)
-        magnet = await loop.run_in_executor(None, client.get_magnet, topic_id)
     except Exception:
         logger.exception("Download failed for topic_id: %s", topic_id)
         await query.edit_message_text("Rutracker временно недоступен")
@@ -137,12 +136,6 @@ async def handle_selection(update: Update, context) -> None:
         document=io.BytesIO(torrent_bytes),
         filename=f"{topic_id}.torrent",
     )
-    if magnet:
-        await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text=f"`{magnet}`",
-            parse_mode="Markdown",
-        )
 
 
 def main() -> None:
