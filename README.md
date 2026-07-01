@@ -3,6 +3,8 @@
 Telegram bot that searches rutracker.org and sends back the `.torrent` file
 for the release you pick.
 
+Deploys automatically to the VDS on every push to `main` via GitHub Actions.
+
 ## How it works
 
 - Send a search term to the bot in Telegram.
